@@ -9,7 +9,7 @@ const io = new socket_io_1.Server(httpServer, {
     }
 });
 io.on("connection", (socket) => {
-    console.log(`user connected ${socket}`);
+    console.log(`user connected ${socket.id}`);
 });
 httpServer.listen(3000, () => {
     console.log("listening on port 3000");
