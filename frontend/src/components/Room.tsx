@@ -10,6 +10,8 @@ export default function Room() {
     const age = searchParam.get("age");
     const [socket, setSocket] = useState<null | Socket>(null);
     const [socketId, setSocketId] = useState<String | null>(null);
+    const [message, setMessage] = useState("");
+    const [reply, setReply] = useState("");
 
     useEffect(() => {
         const socketInstance = io(URL);
@@ -18,6 +20,10 @@ export default function Room() {
         socketInstance.on("connect", () => {
             setSocketId(socketInstance.id || null);
         });
+
+        socketInstance.on("server-reply", (serverReply: string) => {
+            setReply(serverReply)
+        });
         // Cleanup on unmount
 
         return () => {
@@ -25,10 +31,29 @@ export default function Room() {
         };
     }, []); // Empty dependency array ensures this runs once on mount
 
+    const onSendMessage = () => {
+        // console.log(`onSendMessage: ${message}`)
+        if(socket && message) {
+            socket.emit("clientMsg", message);
+            setMessage("");
+        }
+    }
+
     return (
-        <>
+        <div className="flex flex-col gap-4">
             <h1> Hi {name}!! You look good for {age}</h1>
             <p>{`This is your socket ${socketId}`}</p>
-        </>
+            <div className="flex flex-row gap-2 justify-center">
+                <input 
+                type="text"
+                className="rounded rounded-lg px-4"
+                value={message}
+                onChange={(ip) => setMessage(ip.target.value)}
+                placeholder="Enter Your Msg Here"
+                />
+                <button onClick={onSendMessage}>Send</button>
+            </div>
+            <h3>Reply: {reply}</h3>
+        </div>
     );
 }

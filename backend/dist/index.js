@@ -10,6 +10,10 @@ const io = new socket_io_1.Server(httpServer, {
 });
 io.on("connection", (socket) => {
     console.log(`user connected ${socket.id}`);
+    socket.on("clientMsg", (msg) => {
+        console.log(`Client mag: ${msg}`);
+        io.emit("server-reply", `Got msg from the client ${msg}`);
+    });
 });
 httpServer.listen(3000, () => {
     console.log("listening on port 3000");
