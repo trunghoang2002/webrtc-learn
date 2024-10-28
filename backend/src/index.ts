@@ -15,6 +15,12 @@ io.on("connection", (socket: Socket) => {
         console.log(`Client mag: ${msg}`)
         io.emit("server-reply", `Got msg from the client ${msg}`);
     });
+
+    //Create code for webrtc
+    //Offer - get offer form the user
+    //send offer to the agent
+    //send ans to the user
+    //connect
 });
 
 
