@@ -21,6 +21,9 @@ io.on("connection", (socket: Socket) => {
     //send offer to the agent
     //send ans to the user
     //connect
+
+    //Commit for today
+    
 });
 
 
