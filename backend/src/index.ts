@@ -36,6 +36,9 @@ io.on("connection", (socket: Socket) => {
     //send offer to the agent
     //send ans to the user
     //connect
+    socket.on("offerFromClient", offerFromClient => {
+        socket.broadcast.emit("offerFromPeer", offerFromClient);
+    });
 
 
 
