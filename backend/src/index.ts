@@ -8,6 +8,21 @@ const io = new Server(httpServer, {
     }
 });
 
+const fetchUserMedia = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const stream =  await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+            resolve(stream);
+        } catch (error) {
+            console.log(error);
+            reject(error);
+        }
+    });
+}
+
 io.on("connection", (socket: Socket) => {
     console.log(`user connected ${socket.id}`);
 
@@ -22,8 +37,10 @@ io.on("connection", (socket: Socket) => {
     //send ans to the user
     //connect
 
+
+
     //Commit for today
-    
+
 });
 
 
