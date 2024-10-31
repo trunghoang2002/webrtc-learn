@@ -4,6 +4,17 @@ import { useEffect, useState } from "react";
 
 const URL = "http://localhost:3000";
 
+let peerConfiguration = {
+    iceServers:[
+        {
+            urls:[
+              'stun:stun.l.google.com:19302',
+              'stun:stun1.l.google.com:19302'
+            ]
+        }
+    ]
+}
+
 export default function Room() {
     const [searchParam] = useSearchParams();
     const name = searchParam.get("name");
