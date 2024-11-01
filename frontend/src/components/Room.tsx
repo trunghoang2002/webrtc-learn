@@ -23,6 +23,8 @@ export default function Room() {
     const [socketId, setSocketId] = useState<String | null>(null);
     const [message, setMessage] = useState("");
     const [reply, setReply] = useState("");
+    const [peerConnection, setPeerconnection] = useState<RTCPeerConnection | null>(null);
+
 
     useEffect(() => {
         const socketInstance = io(URL);
