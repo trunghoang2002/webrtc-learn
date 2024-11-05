@@ -4,16 +4,16 @@ import { useEffect, useState } from "react";
 
 const URL = "http://localhost:3000";
 
-let peerConfiguration = {
-    iceServers:[
-        {
-            urls:[
-              'stun:stun.l.google.com:19302',
-              'stun:stun1.l.google.com:19302'
-            ]
-        }
-    ]
-}
+// let peerConfiguration = {
+//     iceServers:[
+//         {
+//             urls:[
+//               'stun:stun.l.google.com:19302',
+//               'stun:stun1.l.google.com:19302'
+//             ]
+//         }
+//     ]
+// }
 
 export default function Room() {
     const [searchParam] = useSearchParams();
@@ -23,7 +23,7 @@ export default function Room() {
     const [socketId, setSocketId] = useState<String | null>(null);
     const [message, setMessage] = useState("");
     const [reply, setReply] = useState("");
-    const [peerConnection, setPeerconnection] = useState<RTCPeerConnection | null>(null);
+    // const [peerConnection, setPeerconnection] = useState<RTCPeerConnection | null>(null);
 
 
     useEffect(() => {
@@ -44,18 +44,18 @@ export default function Room() {
         };
     }, []); // Empty dependency array ensures this runs once on mount
 
-    const setupPeerConnection = () => {
+    // const setupPeerConnection = () => {
         
-        const pc = new RTCPeerConnection({
-            iceServers: [
-                {
-                    urls: [ 'stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302' ]
-                }
-            ]
-        });
+    //     const pc = new RTCPeerConnection({
+    //         iceServers: [
+    //             {
+    //                 urls: [ 'stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302' ]
+    //             }
+    //         ]
+    //     });
 
 
-    };
+    // };
 
     const onSendMessage = () => {
         // console.log(`onSendMessage: ${message}`)

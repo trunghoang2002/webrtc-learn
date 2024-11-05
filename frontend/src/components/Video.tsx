@@ -8,7 +8,7 @@ const URL = "http://localhost:3000"
 
 export default function Video() {
     const [socket, setSocket] = useState<Socket | null>(null);
-    const [socketId, setSocketId] = useState<string | null>(null);
+    const [_, setSocketId] = useState<string | null>(null);
     const [offers, setOffers] = useState<any[]>([]);
     const didIOffer = useRef(false);
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
