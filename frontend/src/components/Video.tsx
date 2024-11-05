@@ -1,3 +1,6 @@
+//changed username to useState so it remains persistent between renders and useRef for didIOffer so that it can update synchronously. 
+
+
 import { useEffect, useRef, useState } from "react"
 import { io, Socket } from "socket.io-client";
 
@@ -7,17 +10,19 @@ export default function Video() {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [socketId, setSocketId] = useState<string | null>(null);
     const [offers, setOffers] = useState<any[]>([]);
+    const didIOffer = useRef(false);
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const localStreamRef = useRef<MediaStream | null>(null);
     const remoteStreamRef = useRef<MediaStream | null>(null);
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-
-    const userName = `Rob-${Math.floor(Math.random() * 100000)}`;
-    const password = "x";
+    const [userName] = useState(`Rob-${Math.floor(Math.random() * 100000)}`);
+    // const password = "x";
 
     useEffect(() => {
-        const socketInstance =  io(URL);
+        const socketInstance =  io(URL, {
+            query: {userName},
+        });
         setSocket(socketInstance);
 
         socketInstance.on("connect", () => {
@@ -96,9 +101,12 @@ export default function Video() {
         //EventListners 
         peerConnection.addEventListener("icecandidate", (event: RTCPeerConnectionIceEvent)=> {
             if(event.candidate && socket) {
+                console.log("checking did i off er in iceCandidate event ", didIOffer);
+                console.log("ICE candidates ", event.candidate)
                 socket.emit("sendIceCandidatesToSignallingServer", {
                     iceCandidate: event.candidate,
-                    iceUserName: userName
+                    iceUserName: userName,
+                    didIOffer
                 });
             }
         });
@@ -123,6 +131,9 @@ export default function Video() {
             const peerConnection = peerConnectionRef.current;
             if(peerConnection) {
                 const offer = await peerConnection.createOffer();
+                console.log("Create Offer", offer);
+                didIOffer.current = true;
+                console.log("ser Did i offer ", didIOffer)
                 await peerConnection.setLocalDescription(offer);
                 socket?.emit("newOffer", offer);
             }
@@ -138,10 +149,14 @@ export default function Video() {
         try {
             const peerConnection = peerConnectionRef.current;
             if(peerConnection) {
-                const answer = await peerConnection.createAnswer();
+                const answer = await peerConnection.createAnswer({});
                 await peerConnection.setLocalDescription(answer);
                 offerObj.answer = answer;
-                socket?.emit("newAnswer", offerObj);
+                const offerIceCandidates = await socket?.emitWithAck("newAnswer", offerObj);
+                offerIceCandidates.array.forEach( (c: RTCIceCandidate) => {
+                    peerConnection.addIceCandidate(c);
+                    console.log("============== Added Ice Candidates ==============")
+                });
             }
         } catch (error) {
             console.log("Error when creating answer: ", error);
@@ -160,6 +175,7 @@ export default function Video() {
     return (
         <>
             <h1> This is Video Room </h1>
+            <h2> User Name: {userName}</h2>
             <div className="flex flex-row justify-between gap-3">
                 <video ref={localVideoRef}  autoPlay playsInline muted> </video>
                 <video ref={remoteVideoRef} autoPlay playsInline> </video>
