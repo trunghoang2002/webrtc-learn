@@ -10,6 +10,7 @@ export default function Landing() {
             This is the Landing page. 
         </h1>
         <Link to={`/room/?name=${name}&age=${age}`}> Go to Room </Link>
+        <Link to={'/video'}> Go to Video </Link>
         </>
     )
 }
