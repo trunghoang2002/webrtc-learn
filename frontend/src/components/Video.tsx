@@ -48,7 +48,7 @@ export default function Video() {
             peerConnectionRef.current?.setRemoteDescription(offerObj.answer);
         });
 
-        socketInstance.on("receiveIceCandidatesFromServer", (iceCandidate) => {
+        socketInstance.on("receivedIceCandidateFromServer", (iceCandidate) => {
             console.log(iceCandidate);
             // Add Ice candidates to peer connection as remote
             // addNewIceCandidates(iceCandidate);
@@ -65,7 +65,7 @@ export default function Video() {
         try{
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: true,
-                audio: true
+                // audio: true
             });
             if(localVideoRef.current) 
                 localVideoRef.current.srcObject = stream;
@@ -153,7 +153,8 @@ export default function Video() {
                 await peerConnection.setLocalDescription(answer);
                 offerObj.answer = answer;
                 const offerIceCandidates = await socket?.emitWithAck("newAnswer", offerObj);
-                offerIceCandidates.array.forEach( (c: RTCIceCandidate) => {
+                console.log("Offer ICE Candidate", offerIceCandidates[0])
+                offerIceCandidates.forEach( (c: RTCIceCandidate) => {
                     peerConnection.addIceCandidate(c);
                     console.log("============== Added Ice Candidates ==============")
                 });
