@@ -7,23 +7,26 @@ const URL = "http://localhost:3000"
 
 export default function Video() {
     const [_, setSocket] = useState<Socket | null>(null);
+    const [socketId, setSocketId] = useState("");
 
     useEffect(()=> {
         const socketInstance = io(URL)
         setSocket(socketInstance)
 
-        socketInstance.on("connection", () => {
+        socketInstance.on("connect", () => {
+            setSocketId(socketInstance.id!)
             console.log("Connected to socket ", socketInstance.id );
         });
 
         return () => {
-            console.log("unmount")
+            console.log("Disconnected")
+            socketInstance.disconnect()
         }
     }, []);
 
     return (
         <>
-        <h1> This is the Video Page </h1>
+        <h1> Connected with Socket Id: {socketId} </h1>
         </>
     )
 }

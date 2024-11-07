@@ -12,6 +12,11 @@ const io = new Server(httpServer, {
 
 io.on("connection", (socket: Socket) => {
   console.log("Connected Socket: ", socket.id);
+
+  socket.on("disconnect", (reason) => {
+    console.log("Disconnected socket: ", socket.id, reason );
+  });
+  
 });
 
 httpServer.listen(3000);
