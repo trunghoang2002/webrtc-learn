@@ -21,7 +21,9 @@
     "tsconfig-paths": "^4.2.0"
   },
   "dependencies": {
+    "@roamhq/wrtc": "^0.8.0",
     "express": "^4.21.1",
+    "node-pre-gyp": "^0.17.0",
     "socket.io": "^4.8.1",
     "typescript": "^5.6.3"
   }
