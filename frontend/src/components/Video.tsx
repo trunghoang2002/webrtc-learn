@@ -55,7 +55,7 @@ export default function Video() {
         });
 
         peerConnectionRef.current.addEventListener('track', (event) => {
-            console.log("Received track from server:", event);
+            console.log("Received track from server:", event.track);
             console.log("Track ID:", event.track.id);
             console.log("Track kind:", event.track.kind);  // Should be 'audio'
             console.log("Track label:", event.track.label);
@@ -65,7 +65,6 @@ export default function Video() {
             console.log("Server Stream: ", serverStream);
             if(remoteAudioRef.current)
                 remoteAudioRef.current.srcObject = serverStream
-
         });
 
         // get local audio stream and attach it to the HTMLAudioEle and sedd to the server
@@ -85,6 +84,18 @@ export default function Video() {
                 socketRef.current?.emit("client-ice-candidate", event.candidate)
         });
 
+        peerConnectionRef.current.addEventListener("connectionstatechange", (_) => { 
+            if(peerConnectionRef.current?.connectionState === "connected"){
+                console.log("Connected with the server")
+                socketRef.current?.emit("client-connected", { socketId: socketRef.current?.id })
+            }
+        });
+
+        socketRef.current?.on("disconnect", () => {
+            console.log("Socket Disconnected")
+            setSocketId(socketRef.current?.id!);
+        })
+
         const offer = await peerConnectionRef.current.createOffer(); console.log("Offer Created")
         await peerConnectionRef.current.setLocalDescription(offer);console.log("Local Descriptionset")
         socketRef.current?.emit("client-offer", offer);
@@ -103,6 +114,9 @@ export default function Video() {
         if(localAudioRef.current)
             localAudioRef.current.srcObject = null
 
+        if(remoteAudioRef.current)
+            remoteAudioRef.current.srcObject = null
+
         setSocketId("")
 
         console.log("Disconnected")
@@ -113,8 +127,11 @@ export default function Video() {
         <h1> Connected with Socket Id: {socketId} </h1>
         <button onClick={connect}> Connect </button>
         <button onClick={disconect}> Disconnect </button>
-        <video ref={localAudioRef} autoPlay playsInline />
-        <video ref={remoteAudioRef} autoPlay playsInline />
+        {/* <video ref={localAudioRef} autoPlay playsInline /> */}
+        <h2> Remote Video </h2>
+        <div className="flex flex-col justify-center items-center">
+            <video ref={remoteAudioRef} autoPlay playsInline />
+        </div>
         </>
     )
 }

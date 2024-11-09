@@ -20,10 +20,10 @@ io.on("connection", (socket: Socket) => {
     iceServers: [{ urls : ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] } ]
   });
 
-  users[socket.id] = { peerConnection };
+  // users[socket.id] = { peerConnection };
 
-   // getting server Ice candidates
-   peerConnection.addEventListener("icecandidate", (event) => {
+  // getting server Ice candidates
+  peerConnection.addEventListener("icecandidate", (event) => {
     console.log("Got Ice candidates form stun sending to client")
     if(event.candidate) {
       //emit candidates to the user
@@ -63,12 +63,18 @@ io.on("connection", (socket: Socket) => {
     const sender = peerConnection.addTrack(event.track);
   });
 
+  socket.on("client-connected", () => {  
+    console.log("Client connected");
+    socket.disconnect()
+  });
+
+  
   socket.on("disconnect", (reason) => {
     console.log("Disconect socket: ", socket.id, reason );
-    if(peerConnection)  {
-      peerConnection.close()
-      console.log("Closed Peer connection")
-    }
+    // if(peerConnection)  {
+    //   peerConnection.close()
+    //   console.log("Closed Peer connection")
+    // }
   });
   
 });
