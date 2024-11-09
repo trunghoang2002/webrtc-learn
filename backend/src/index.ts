@@ -24,6 +24,7 @@ io.on("connection", (socket: Socket) => {
 
    // getting server Ice candidates
    peerConnection.addEventListener("icecandidate", (event) => {
+    console.log("Got Ice candidates form stun sending to client")
     if(event.candidate) {
       //emit candidates to the user
       socket.emit("server-ice-candidate", event.candidate)
@@ -33,6 +34,7 @@ io.on("connection", (socket: Socket) => {
 
   //Handle incomming client ice candidates
   socket.on("client-ice-candidate", async (candidate: RTCIceCandidate) => {
+    console.log("Got Ice candidated from client");
     try {
       await peerConnection.addIceCandidate(candidate);
     } catch (error) {
@@ -42,6 +44,7 @@ io.on("connection", (socket: Socket) => {
 
   //handle SDP offer comming from the client
   socket.on("client-offer", async (offer: RTCSessionDescription) => {
+    console.log("Received offer from client")
     await peerConnection.setRemoteDescription(offer);
 
     //creating answer
@@ -53,8 +56,10 @@ io.on("connection", (socket: Socket) => {
 
   // handling track received from the client 
   peerConnection.addEventListener("track", (event) => {
-    console.log("Received audio track from user");
-
+    console.log("Received audio track from user", event.track);
+    console.log("Track type:", event.track.kind); // 'audio' or 'video'
+    console.log("Track label:", event.track.label); 
+    console.log("Track Id:", event.track.id); 
     const sender = peerConnection.addTrack(event.track);
   });
 
