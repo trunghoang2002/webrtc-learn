@@ -9,8 +9,8 @@ export default function Video() {
     const socketRef = useRef<Socket | null>(null)
     const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
     const localStreamRef = useRef<MediaStream | null>(null)
-    const localAudioRef = useRef<HTMLVideoElement | null>(null)
-    const remoteAudioRef = useRef<HTMLVideoElement | null>(null);
+    const localAudioRef = useRef<HTMLAudioElement | null>(null)
+    const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
     const [socketId, setSocketId] = useState("");
 
     // const connect = async () => {
@@ -60,6 +60,7 @@ export default function Video() {
             console.log("Track kind:", event.track.kind);  // Should be 'audio'
             console.log("Track label:", event.track.label);
             
+            const audioContext = new AudioContext();
             const serverStream = new MediaStream();
             serverStream.addTrack(event.track)
             console.log("Server Stream: ", serverStream);
@@ -69,7 +70,7 @@ export default function Video() {
 
         // get local audio stream and attach it to the HTMLAudioEle and sedd to the server
         // and send ICE candidates to the server and create offer (Local to Server)
-        const localStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStreamRef.current = localStream
         if(localAudioRef.current)
             localAudioRef.current.srcObject = localStream
@@ -127,11 +128,11 @@ export default function Video() {
         <h1> Connected with Socket Id: {socketId} </h1>
         <button onClick={connect}> Connect </button>
         <button onClick={disconect}> Disconnect </button>
-        {/* <video ref={localAudioRef} autoPlay playsInline /> */}
+        {/* <audio ref={localAudioRef} autoPlay playsInline /> */}
         <h2> Remote Video </h2>
-        <div className="flex flex-col justify-center items-center">
-            <video ref={remoteAudioRef} autoPlay playsInline />
-        </div>
+        {/* <div className="flex flex-col justify-center items-center"> */}
+            <audio ref={remoteAudioRef} autoPlay playsInline />
+        {/* </div> */}
         </>
     )
 }
