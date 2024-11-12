@@ -9,8 +9,12 @@ export default function Landing() {
         <h1>
             This is the Landing page. 
         </h1>
-        <Link to={`/room/?name=${name}&age=${age}`}> Go to Room </Link>
-        <Link to={'/video'}> Go to Video </Link>
+        <div className="flex flex-col items-center">
+            <Link to={`/room/?name=${name}&age=${age}`}> Go to Room </Link>
+            <Link to={'/video'}> Go to Video </Link>
+            <Link to={'/pythonws'}> Go to Python Websocket </Link>
+        </div>
+        
         </>
     )
 }
