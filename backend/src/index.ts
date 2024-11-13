@@ -63,6 +63,7 @@ io.on("connection", (socket: Socket) => {
 
     //creating answer
     const answer = await peerConnection.createAnswer();
+    console.log("Created answer: ", answer);
     await peerConnection.setLocalDescription(answer);
 
     socket.emit("server-answer", answer);

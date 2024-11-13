@@ -97,7 +97,8 @@ export default function Video() {
             setSocketId(socketRef.current?.id!);
         })
 
-        const offer = await peerConnectionRef.current.createOffer(); console.log("Offer Created")
+        const offer = await peerConnectionRef.current.createOffer(); 
+        console.log("Offer Created: ", offer)
         await peerConnectionRef.current.setLocalDescription(offer);console.log("Local Descriptionset")
         socketRef.current?.emit("client-offer", offer);
 
