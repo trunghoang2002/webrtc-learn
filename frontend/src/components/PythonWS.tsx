@@ -14,13 +14,13 @@ export default function PythonWS() {
         })
 
         // Add remote stream to video element
-        pcRef.current.addEventListener("track", (event) => {
-            console.log("Received remote stream: ", event.track)
+        pcRef.current.ontrack =  (event) => {
+            console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
             const remoteStream = new MediaStream();
             remoteStream.addTrack(event.track);
             if(remoteVideoRef.current)
                 remoteVideoRef.current.srcObject = remoteStream;
-        })
+        }
         
         // Get local media and attach to peer connection
         await navigator.mediaDevices.getUserMedia({video: true})
@@ -29,7 +29,7 @@ export default function PythonWS() {
             if(localVideoRef.current)
                 localVideoRef.current.srcObject = stream;
             stream.getTracks().forEach((track) => {
-                pcRef.current?.addTrack(track);
+                pcRef.current?.addTrack(track, stream);
             })
         })
         .catch((error) => {
@@ -45,19 +45,19 @@ export default function PythonWS() {
             console.log("Local Description Set")
         })
         .then(() => {
+            console.log("Waiting for Ice Gathering to complete")
             return new Promise<void>((resolve, _) => {
-                if(pcRef.current?.iceGatheringState === "complete") {
-                    resolve();
+                 
+                const check = () => {
+                    if(pcRef.current?.iceGatheringState === "complete") {
+                        pcRef.current?.removeEventListener("icegatheringstatechange", () => {});
+                        console.log("Ice Gathering Complete")
+                        resolve();
+                    }
                 }
-                else {
-                    pcRef.current?.addEventListener("icegatheringstatechange", () => {
-                        if(pcRef.current?.iceGatheringState === "complete") {
-                            pcRef.current?.removeEventListener("icegatheringstatechange", () => {});
-                            console.log("Ice Gathering Complete")
-                            resolve();
-                        }
-                    });
-                }
+                
+                pcRef.current?.addEventListener("icegatheringstatechange", check);
+                check();
             });
         })
         .then(() => {
@@ -96,6 +96,10 @@ export default function PythonWS() {
             pcRef.current = null;
             console.log("Peer Connection Closed")
         }
+        if(localVideoRef.current)
+            localVideoRef.current.srcObject = null;
+        if(remoteVideoRef.current)
+            remoteVideoRef.current.srcObject = null;
     };
         
 

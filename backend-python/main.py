@@ -49,29 +49,34 @@ async def offer(request: Request):
         pc = RTCPeerConnection()
         print("Created PeerConnection Object")
 
-        @pc.on("iceconnectionstatechange")
-        async def on_iceconnectionstatechange():
-            print("ICE connection state is: ", pc.iceConnectionState)
-            if pc.iceConnectionState == "failed":
-                await pc.close()
-                logger.info("PeerConnection closed")
+        # @pc.on("iceconnectionstatechange")
+        # async def on_iceconnectionstatechange():
+        #     print("ICE connection state is: ", pc.iceConnectionState)
+        #     if pc.iceConnectionState == "failed":
+        #         await pc.close()
+        #         logger.info("PeerConnection closed")
         
         @pc.on("track")
-        async def on_track(track):
-            print(f"Track received: {track} of kind {track.kind}" )
-            local_video = VideoTransformTrack(
-                track
-            )
-            pc.addTrack(local_video)
-        
-        await pc.setRemoteDescription(offer)
-        print("Remote Description Set \n",)
+        def on_track(track):
+            print(f"Track received: {track} of kind {track.kind}")
 
-        answer = await pc.createAnswer()
-        print("Answer Created: \n" , )
+            # if track.kind == "audio":
+            #     pass
+            #     # pc.addTrack(player.audio)
+            #     # recorder.addTrack(track)
+            # elif track.kind == "video":
+            #     # local_video = VideoTransformTrack(
+            #     #     track, transform=params["video_transform"]
+            #     # )
+            pc.addTrack(track)
         
+        # handle offer
+        await pc.setRemoteDescription(offer)
+        # await recorder.start()
+
+        # send answer
+        answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
-        print("Local Description Set: \n", pc.localDescription)
         
     except Exception as e:
         print("Exception: \n", e)
