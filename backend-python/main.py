@@ -1,12 +1,15 @@
 import asyncio
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCIceServer, RTCConfiguration,RTCIceCandidate, MediaStreamTrack
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from aiortc import RTCPeerConnection, RTCSessionDescription
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from tracks import AudioTransformTrack, VideoTransformTrack
 import uvicorn
 import logging
+import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("server")
+
 
 # create FastAPI app
 app = FastAPI()
@@ -18,22 +21,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allows all headers
 )
-
-class VideoTransformTrack(MediaStreamTrack):
-    """
-    A video stream track that transforms frames from an another track.
-    """
-
-    kind = "video"
-
-    def __init__(self, track):
-        super().__init__()  # don't forget this!
-        self.track = track
-
-    async def recv(self):
-        frame = await self.track.recv()
-
-        return frame
 
 @app.get("/")
 async def read_root():
@@ -48,31 +35,17 @@ async def offer(request: Request):
 
         pc = RTCPeerConnection()
         print("Created PeerConnection Object")
-
-        # @pc.on("iceconnectionstatechange")
-        # async def on_iceconnectionstatechange():
-        #     print("ICE connection state is: ", pc.iceConnectionState)
-        #     if pc.iceConnectionState == "failed":
-        #         await pc.close()
-        #         logger.info("PeerConnection closed")
         
         @pc.on("track")
         def on_track(track):
             print(f"Track received: {track} of kind {track.kind}")
-
-            # if track.kind == "audio":
-            #     pass
-            #     # pc.addTrack(player.audio)
-            #     # recorder.addTrack(track)
-            # elif track.kind == "video":
-            #     # local_video = VideoTransformTrack(
-            #     #     track, transform=params["video_transform"]
-            #     # )
-            pc.addTrack(track)
-        
+            if(track.kind == "audio"):
+                pc.addTrack(AudioTransformTrack(track))
+            if(track.kind == "video"):
+                pc.addTrack(VideoTransformTrack(track))
+       
         # handle offer
         await pc.setRemoteDescription(offer)
-        # await recorder.start()
 
         # send answer
         answer = await pc.createAnswer()

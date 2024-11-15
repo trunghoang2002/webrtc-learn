@@ -2,3 +2,6 @@ python-dotenv
 fastapi
 uvicorn
 aiortc
+numpy>=1.24.0
+torch>=1.12.0
+torchaudio>=0.12.0

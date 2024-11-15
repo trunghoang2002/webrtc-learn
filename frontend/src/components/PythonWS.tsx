@@ -6,6 +6,7 @@ export default function PythonWS() {
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
+    const remoteStreamRef = useRef(new MediaStream());
 
     
     const connect = async () => {
@@ -16,14 +17,13 @@ export default function PythonWS() {
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
             console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
-            const remoteStream = new MediaStream();
-            remoteStream.addTrack(event.track);
+            remoteStreamRef.current.addTrack(event.track);
             if(remoteVideoRef.current)
-                remoteVideoRef.current.srcObject = remoteStream;
+                remoteVideoRef.current.srcObject = remoteStreamRef.current;
         }
         
         // Get local media and attach to peer connection
-        await navigator.mediaDevices.getUserMedia({video: true})
+        await navigator.mediaDevices.getUserMedia({video: true, audio: true})
         .then((stream) => {
             console.log("Got Local Stream")
             if(localVideoRef.current)
@@ -47,15 +47,13 @@ export default function PythonWS() {
         .then(() => {
             console.log("Waiting for Ice Gathering to complete")
             return new Promise<void>((resolve, _) => {
-                 
                 const check = () => {
                     if(pcRef.current?.iceGatheringState === "complete") {
-                        pcRef.current?.removeEventListener("icegatheringstatechange", () => {});
+                        // pcRef.current?.removeEventListener("icegatheringstatechange", () => {});
                         console.log("Ice Gathering Complete")
                         resolve();
                     }
                 }
-                
                 pcRef.current?.addEventListener("icegatheringstatechange", check);
                 check();
             });
@@ -100,6 +98,8 @@ export default function PythonWS() {
             localVideoRef.current.srcObject = null;
         if(remoteVideoRef.current)
             remoteVideoRef.current.srcObject = null;
+        
+        window.location.reload();
     };
         
 
@@ -111,7 +111,7 @@ export default function PythonWS() {
                 <button onClick={disconnect}> Disconnect </button>
             </div>
             <h1> Local Video </h1>
-            <video ref={localVideoRef} autoPlay playsInline/>
+            {/* <video ref={localVideoRef} autoPlay playsInline/> */}
             <h1> Remote Video </h1>
             <video ref={remoteVideoRef} autoPlay playsInline/>
         </div>
