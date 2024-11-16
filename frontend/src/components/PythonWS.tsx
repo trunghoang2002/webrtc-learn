@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react"
+// import { useMicVAD } from "@ricky0123/vad-react";
 
 const URL = 'http://0.0.0.0:80'
 
@@ -21,14 +22,26 @@ export default function PythonWS() {
             if(remoteVideoRef.current)
                 remoteVideoRef.current.srcObject = remoteStreamRef.current;
         }
+
+        // const vad =  useMicVAD({
+
+        // })
         
+        const constrains = {
+            video: true, 
+            audio: {
+                channelCount: 1,
+                sampleRate: 16000
+            }
+        }
         // Get local media and attach to peer connection
-        await navigator.mediaDevices.getUserMedia({video: true, audio: true})
+        await navigator.mediaDevices.getUserMedia(constrains)
         .then((stream) => {
             console.log("Got Local Stream")
             if(localVideoRef.current)
                 localVideoRef.current.srcObject = stream;
             stream.getTracks().forEach((track) => {
+                console.log("CAPABILITIES: ", track.getCapabilities())
                 pcRef.current?.addTrack(track, stream);
             })
         })
