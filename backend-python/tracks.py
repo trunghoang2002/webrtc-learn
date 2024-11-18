@@ -1,11 +1,16 @@
-
+import io
+import os
 from aiortc import MediaStreamTrack, AudioStreamTrack, VideoStreamTrack
 from av import AudioFrame, VideoFrame
+from pydub import AudioSegment
 import numpy as np
+import requests
 import torchaudio
 import torch
 import scipy.signal
 from faster_whisper import WhisperModel
+from dotenv import load_dotenv
+load_dotenv()
 torch.set_num_threads(1)
 
 class VideoTransformTrack(MediaStreamTrack):
@@ -32,20 +37,22 @@ class AudioTransformTrack(AudioStreamTrack):
 
     kind = "audio"
     cnt =0
+    endFrameCnt = 0
     concat = False
     audio_data = []
+    audio_buffer = []
     model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
     # (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
     MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 4, "en"
     whisper_model = WhisperModel(
-        model_type=MODEL_TYPE,
+        model_size_or_path=MODEL_TYPE,
         device=RUN_TYPE,
         compute_type=COMPUTE_TYPE,
         num_workers=NUM_WORKERS,
         cpu_threads=CPU_THREADS,
         download_root="./models"
     )
-
+    
     def __init__(self, track: AudioStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
@@ -65,12 +72,82 @@ class AudioTransformTrack(AudioStreamTrack):
         resampled_audio = scipy.signal.resample(audio_data, num_samples)
         
         return resampled_audio
+    
+    def float32_to_mp3(self, audio_buffer, sample_rate=16000):
+        """
+        Convert a float32 audio buffer to MP3 format in memory.
+        
+        :param audio_buffer: The audio buffer as a numpy array.
+        :param sample_rate: The sample rate of the audio buffer.
+        :return: A BytesIO object containing the MP3 data.
+        """
+        # Convert numpy array to raw audio
+        audio_segment = AudioSegment(
+            audio_buffer.tobytes(),
+            frame_rate=sample_rate,
+            sample_width=audio_buffer.dtype.itemsize,
+            channels=1  # Mono
+        )
+        # Export to a BytesIO object
+        mp3_buffer = io.BytesIO()
+        audio_segment.export(mp3_buffer, format="mp3")
+        mp3_buffer.seek(0)  # Reset pointer to the start
+        return mp3_buffer
+    
+    def transcribe_audio_from_buffer(self, audio_buffer, sample_rate=16000, model="whisper-1"):
+        """
+        Send an audio buffer directly to OpenAI's transcription API.
+
+        :param audio_buffer: The audio buffer as a numpy array.
+        :param api_key: OpenAI API key.
+        :param sample_rate: The sample rate of the audio buffer.
+        :param model: Whisper model to use (default: "whisper-1").
+        :return: Transcription text.
+        """
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        deepgram_api_key = "ba7c7e70c46508a7a9fb8ef0da3b8e06a319e9fc"
+
+        # Convert audio buffer to MP3 in memory
+        mp3_buffer = self.float32_to_mp3(audio_buffer, sample_rate)
+        
+        # Make OPENAI the API request
+        openai_url = "https://api.openai.com/v1/audio/transcriptions"
+        openai_headers = {
+            "Authorization": f"Bearer {openai_api_key}"
+        }
+        files = {
+            "file": ("audio.mp3", mp3_buffer, "audio/mpeg")
+        }
+        data = {
+            "model": model
+        }
+
+        # DEEPGRAM URL 
+        deepgram_url = "https://api.deepgram.com/v1/listen"
+        deepgram_headers = {
+            "Authorization": f"Token {deepgram_api_key}",
+            "Content-Type": "application/json"
+        }
+        params = {
+            "model": "nova-2",
+            "smart_format": True
+        }
+        
+        # response = requests.post(openai_url, headers=openai_headers, files=files, data=data)
+        response = requests.post(deepgram_url, headers=deepgram_headers, params=params, data=files)
+        
+        if response.status_code == 200:
+            return response.json()["text"]
+        else:
+            raise Exception(f"Failed to transcribe: {response.status_code}, {response.text}")
+
 
     async def recv(self):
         frame: AudioFrame = await self.track.recv()
             
         frameNP = frame.to_ndarray()
-
+        # constantly getting frames need to have states 
+        # Silence; Speaking; Speaking_Stopped
 
         # print(audio_data.shape)
         frameNP = frameNP.reshape(-1, 2)
@@ -87,15 +164,47 @@ class AudioTransformTrack(AudioStreamTrack):
             self.audio_data = np.concatenate((self.audio_data, frameNP))
             self.concat = False
             # print(f"Resampled audio: {self.audio_data.shape}")
-            audioFolat32 = self.int2float(self.audio_data)
-            audioFolat32 = audioFolat32[:512]
+            audioFloat32 = self.int2float(self.audio_data)
+            audioFloat32_512 = audioFloat32[:512]
             # print(audioFolat32.shape)
-            new_confidence = self.model(torch.from_numpy(audioFolat32), 16000).item()
-            print(f"Confidence: {new_confidence}")
+            # print("audioFloat32 type: ", type(audioFloat32), "Element: ", audioFloat32[0], "Shape: ", audioFloat32.shape)
+
+            new_confidence = self.model(torch.from_numpy(audioFloat32_512), 16000).item()
+            new_confidence = (int) (round(new_confidence, 1) * 10)
+            if(new_confidence > 0):
+                self.endFrameCnt = 0
+                self.audio_buffer.append(audioFloat32)
+                print(f"Confidence: {new_confidence:02d} {'=' * new_confidence}> : Cnt: {len(self.audio_buffer)}")
+            else:
+                if(len(self.audio_buffer) <= 1):
+                    self.audio_buffer = [audioFloat32]
+
+                elif(len(self.audio_buffer) > 1):
+                    if(self.endFrameCnt < 5):
+                        self.endFrameCnt += 1
+                        self.audio_buffer.append(audioFloat32)
+                    else:
+                        print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
+                        if(len(self.audio_buffer) > 10):
+                            self.audio_buffer = np.concatenate(self.audio_buffer)
+                            print(f"After  Audio Buffer Type: {type(self.audio_buffer)} Audio Buffer Shape: {self.audio_buffer.shape}")
+                            segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG, temperature=0.7)
+                            segments = [s.text for s in segments]
+                            transcription = " ".join(segments)
+                            print(f"Transcription: {transcription}")
+
+                            # openai_response = self.transcribe_audio_from_buffer(self.audio_buffer)
+                            # print(f"OpenAI Response: {openai_response}")
+
+                        self.audio_buffer = []
+                        self.endFrameCnt = 0
+                
+                
+
         else:
             self.audio_data = frameNP
             self.concat = True
 
       
-        print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout.name}",)
+        # print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout.name}",)
         return frame

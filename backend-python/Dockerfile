@@ -5,7 +5,7 @@ WORKDIR /app
 COPY . /app
 
 RUN apt-get install libgomp1
-
+RUN apt-get install ffmpeg
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 EXPOSE 80
