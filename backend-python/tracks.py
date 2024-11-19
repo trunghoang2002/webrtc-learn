@@ -42,8 +42,8 @@ class AudioTransformTrack(AudioStreamTrack):
     audio_data = []
     audio_buffer = []
     model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
-    # (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
-    MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 4, "en"
+    (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
+    MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
     whisper_model = WhisperModel(
         model_size_or_path=MODEL_TYPE,
         device=RUN_TYPE,
@@ -56,6 +56,7 @@ class AudioTransformTrack(AudioStreamTrack):
     def __init__(self, track: AudioStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
+        # self.whisper_model = whisper_model 
 
     def int2float(self, sound):
         abs_max = np.abs(sound).max()
@@ -180,26 +181,26 @@ class AudioTransformTrack(AudioStreamTrack):
                     self.audio_buffer = [audioFloat32]
 
                 elif(len(self.audio_buffer) > 1):
-                    if(self.endFrameCnt < 5):
+                    if(self.endFrameCnt < 20):
                         self.endFrameCnt += 1
                         self.audio_buffer.append(audioFloat32)
                     else:
                         print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
-                        if(len(self.audio_buffer) > 10):
+                        if(len(self.audio_buffer) > 25):
                             self.audio_buffer = np.concatenate(self.audio_buffer)
                             print(f"After  Audio Buffer Type: {type(self.audio_buffer)} Audio Buffer Shape: {self.audio_buffer.shape}")
-                            segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG, temperature=0.7)
+                            segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG)
                             segments = [s.text for s in segments]
                             transcription = " ".join(segments)
                             print(f"Transcription: {transcription}")
+
+                            
 
                             # openai_response = self.transcribe_audio_from_buffer(self.audio_buffer)
                             # print(f"OpenAI Response: {openai_response}")
 
                         self.audio_buffer = []
-                        self.endFrameCnt = 0
-                
-                
+                        self.endFrameCnt = 0 
 
         else:
             self.audio_data = frameNP
