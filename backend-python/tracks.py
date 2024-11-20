@@ -96,52 +96,7 @@ class AudioTransformTrack(AudioStreamTrack):
         return mp3_buffer
     
     def transcribe_audio_from_buffer(self, audio_buffer, sample_rate=16000, model="whisper-1"):
-        """
-        Send an audio buffer directly to OpenAI's transcription API.
-
-        :param audio_buffer: The audio buffer as a numpy array.
-        :param api_key: OpenAI API key.
-        :param sample_rate: The sample rate of the audio buffer.
-        :param model: Whisper model to use (default: "whisper-1").
-        :return: Transcription text.
-        """
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        deepgram_api_key = "ba7c7e70c46508a7a9fb8ef0da3b8e06a319e9fc"
-
-        # Convert audio buffer to MP3 in memory
-        mp3_buffer = self.float32_to_mp3(audio_buffer, sample_rate)
-        
-        # Make OPENAI the API request
-        openai_url = "https://api.openai.com/v1/audio/transcriptions"
-        openai_headers = {
-            "Authorization": f"Bearer {openai_api_key}"
-        }
-        files = {
-            "file": ("audio.mp3", mp3_buffer, "audio/mpeg")
-        }
-        data = {
-            "model": model
-        }
-
-        # DEEPGRAM URL 
-        deepgram_url = "https://api.deepgram.com/v1/listen"
-        deepgram_headers = {
-            "Authorization": f"Token {deepgram_api_key}",
-            "Content-Type": "application/json"
-        }
-        params = {
-            "model": "nova-2",
-            "smart_format": True
-        }
-        
-        # response = requests.post(openai_url, headers=openai_headers, files=files, data=data)
-        response = requests.post(deepgram_url, headers=deepgram_headers, params=params, data=files)
-        
-        if response.status_code == 200:
-            return response.json()["text"]
-        else:
-            raise Exception(f"Failed to transcribe: {response.status_code}, {response.text}")
-
+        self.whisper_model.transcribe()
 
     async def recv(self):
         frame: AudioFrame = await self.track.recv()
@@ -193,8 +148,6 @@ class AudioTransformTrack(AudioStreamTrack):
                             segments = [s.text for s in segments]
                             transcription = " ".join(segments)
                             print(f"Transcription: {transcription}")
-
-                            
 
                             # openai_response = self.transcribe_audio_from_buffer(self.audio_buffer)
                             # print(f"OpenAI Response: {openai_response}")
