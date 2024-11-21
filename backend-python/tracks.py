@@ -10,8 +10,12 @@ import torch
 import scipy.signal
 from faster_whisper import WhisperModel
 from dotenv import load_dotenv
+import asyncio
+from fastapi.concurrency import run_in_threadpool
+from concurrent.futures import ThreadPoolExecutor
 load_dotenv()
 torch.set_num_threads(1)
+
 
 class VideoTransformTrack(MediaStreamTrack):
     """
@@ -20,9 +24,11 @@ class VideoTransformTrack(MediaStreamTrack):
 
     kind = "video"
     cnt = 0
+    executor = None
     def __init__(self, track: MediaStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
+        self.executor = ThreadPoolExecutor()
 
     async def recv(self):
         frame = await self.track.recv()
@@ -95,8 +101,27 @@ class AudioTransformTrack(AudioStreamTrack):
         mp3_buffer.seek(0)  # Reset pointer to the start
         return mp3_buffer
     
-    def transcribe_audio_from_buffer(self, audio_buffer, sample_rate=16000, model="whisper-1"):
-        self.whisper_model.transcribe()
+    async def transcribe_audio(self, audio_buffer):
+        """
+        Perform transcription using whisper_model in a separate thread.
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            self._transcribe_audio_sync,  # The synchronous method
+            audio_buffer
+        )
+    
+    def _transcribe_audio_sync(self, audio_buffer):
+        """
+        Synchronous transcription logic for running in a thread.
+        """
+        print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
+        segments, _ = self.whisper_model.transcribe(audio_buffer, language=self.WHISPER_LANG)
+        segments = [s.text for s in segments]
+        transcription = " ".join(segments)
+        print(f"Transcription: {transcription}")
+        return transcription
 
     async def recv(self):
         frame: AudioFrame = await self.track.recv()
@@ -143,10 +168,13 @@ class AudioTransformTrack(AudioStreamTrack):
                         print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
                         if(len(self.audio_buffer) > 25):
                             self.audio_buffer = np.concatenate(self.audio_buffer)
-                            print(f"After  Audio Buffer Type: {type(self.audio_buffer)} Audio Buffer Shape: {self.audio_buffer.shape}")
-                            segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG)
-                            segments = [s.text for s in segments]
-                            transcription = " ".join(segments)
+
+                            transcription = await run_in_threadpool(self._transcribe_audio_sync, self.audio_buffer)
+                            
+                            # print(f"After  Audio Buffer Type: {type(self.audio_buffer)} Audio Buffer Shape: {self.audio_buffer.shape}")
+                            # segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG)
+                            # segments = [s.text for s in segments]
+                            # transcription = " ".join(segments)
                             print(f"Transcription: {transcription}")
 
                             # openai_response = self.transcribe_audio_from_buffer(self.audio_buffer)
