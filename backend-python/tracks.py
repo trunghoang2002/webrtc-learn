@@ -12,10 +12,86 @@ from faster_whisper import WhisperModel
 from dotenv import load_dotenv
 import asyncio
 from fastapi.concurrency import run_in_threadpool
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import time
 load_dotenv()
 torch.set_num_threads(1)
 
+whisper_model = None
+MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
+
+def initialize_whisper():
+    global whisper_model
+    if whisper_model is None:
+        print(f"Initializing Whisper Model in {os.getpid()}")
+        whisper_model = WhisperModel(
+            model_size_or_path=MODEL_TYPE,
+            device=RUN_TYPE,
+            compute_type=COMPUTE_TYPE,
+            num_workers=NUM_WORKERS,
+            cpu_threads=CPU_THREADS,
+            download_root="./models"
+        )
+
+thread_executor = ThreadPoolExecutor()
+process_executor = ProcessPoolExecutor(max_workers=1, initializer=initialize_whisper)
+
+async def transcribe_audio(audio_buffer):
+    """
+    Perform transcription using whisper_model in a separate thread.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        thread_executor,
+        _transcribe_audio_sync,  # The synchronous method
+        audio_buffer
+    )
+
+def _transcribe_audio_sync(audio_buffer):
+    """
+    Synchronous transcription logic for running in a thread.
+    """
+    print(f"Starting transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
+    segments, _ = whisper_model.transcribe(audio_buffer, language=WHISPER_LANG)
+    segments = [s.text for s in segments]
+    transcription = " ".join(segments)
+    print(f"Transcription: {transcription}")
+    
+    # time.sleep(10)
+    print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    
+
+
+async def transcribe_audio_process(audio_buffer):
+    """
+    Perform transcription using whisper_model in a separate process.
+    """
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        process_executor,
+        _transcribe_audio_sync_process,
+        audio_buffer,
+    )
+
+def _transcribe_audio_sync_process(audio_buffer):
+    """
+    Synchronous transcription logic for running in a thread.
+    """
+    global whisper_model
+    if not whisper_model:
+        raise ValueError("Whisper model not initialized")
+
+    print(f"Starting transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
+    segments, _ = whisper_model.transcribe(audio_buffer, language=WHISPER_LANG)
+    segments = [s.text for s in segments]
+    transcription = " ".join(segments)
+    print(f"PID:{os.getpid()} Transcription: {transcription}")
+    
+    # time.sleep(10)
+    print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    
 
 class VideoTransformTrack(MediaStreamTrack):
     """
@@ -24,17 +100,18 @@ class VideoTransformTrack(MediaStreamTrack):
 
     kind = "video"
     cnt = 0
-    executor = None
     def __init__(self, track: MediaStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
-        self.executor = ThreadPoolExecutor()
+        
 
     async def recv(self):
         frame = await self.track.recv()
         # self.cnt+=1
         # print(self.cnt)
         return frame
+
+
 
 class AudioTransformTrack(AudioStreamTrack):
     """
@@ -49,19 +126,12 @@ class AudioTransformTrack(AudioStreamTrack):
     audio_buffer = []
     model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
     (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
-    MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
-    whisper_model = WhisperModel(
-        model_size_or_path=MODEL_TYPE,
-        device=RUN_TYPE,
-        compute_type=COMPUTE_TYPE,
-        num_workers=NUM_WORKERS,
-        cpu_threads=CPU_THREADS,
-        download_root="./models"
-    )
+    
     
     def __init__(self, track: AudioStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
+        initialize_whisper()
         # self.whisper_model = whisper_model 
 
     def int2float(self, sound):
@@ -100,28 +170,6 @@ class AudioTransformTrack(AudioStreamTrack):
         audio_segment.export(mp3_buffer, format="mp3")
         mp3_buffer.seek(0)  # Reset pointer to the start
         return mp3_buffer
-    
-    async def transcribe_audio(self, audio_buffer):
-        """
-        Perform transcription using whisper_model in a separate thread.
-        """
-        loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            self.executor,
-            self._transcribe_audio_sync,  # The synchronous method
-            audio_buffer
-        )
-    
-    def _transcribe_audio_sync(self, audio_buffer):
-        """
-        Synchronous transcription logic for running in a thread.
-        """
-        print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
-        segments, _ = self.whisper_model.transcribe(audio_buffer, language=self.WHISPER_LANG)
-        segments = [s.text for s in segments]
-        transcription = " ".join(segments)
-        print(f"Transcription: {transcription}")
-        return transcription
 
     async def recv(self):
         frame: AudioFrame = await self.track.recv()
@@ -168,17 +216,8 @@ class AudioTransformTrack(AudioStreamTrack):
                         print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
                         if(len(self.audio_buffer) > 25):
                             self.audio_buffer = np.concatenate(self.audio_buffer)
-
-                            transcription = await run_in_threadpool(self._transcribe_audio_sync, self.audio_buffer)
                             
-                            # print(f"After  Audio Buffer Type: {type(self.audio_buffer)} Audio Buffer Shape: {self.audio_buffer.shape}")
-                            # segments, _ = self.whisper_model.transcribe(self.audio_buffer, language=self.WHISPER_LANG)
-                            # segments = [s.text for s in segments]
-                            # transcription = " ".join(segments)
-                            print(f"Transcription: {transcription}")
-
-                            # openai_response = self.transcribe_audio_from_buffer(self.audio_buffer)
-                            # print(f"OpenAI Response: {openai_response}")
+                            asyncio.create_task(transcribe_audio_process(self.audio_buffer))
 
                         self.audio_buffer = []
                         self.endFrameCnt = 0 
