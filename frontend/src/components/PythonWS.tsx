@@ -20,6 +20,12 @@ export default function PythonWS() {
         pcRef.current.ontrack =  (event) => {
             console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
             
+            if (event.track.kind === "audio") {
+                remoteStreamRef.current.addTrack(event.track);
+                if(remoteVideoRef.current)
+                    remoteVideoRef.current.srcObject = remoteStreamRef.current;
+            }
+            
             if (event.track.kind === "video") {
                 remoteStreamRef.current.addTrack(event.track);
                 if(remoteVideoRef.current)

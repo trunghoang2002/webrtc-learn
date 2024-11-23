@@ -17,6 +17,7 @@ import time
 load_dotenv()
 torch.set_num_threads(1)
 
+print("Entered Tracks.py")
 whisper_model = None
 MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
 
@@ -24,7 +25,7 @@ def initialize_whisper():
     global whisper_model
     if whisper_model is None:
         print(f"Initializing Whisper Model in {os.getpid()}")
-        whisper_model = WhisperModel(
+        whisper_model = WhisperModel (
             model_size_or_path=MODEL_TYPE,
             device=RUN_TYPE,
             compute_type=COMPUTE_TYPE,
@@ -59,8 +60,8 @@ def _transcribe_audio_sync(audio_buffer):
     print(f"Transcription: {transcription}")
     
     # time.sleep(10)
+
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
-    
 
 
 async def transcribe_audio_process(audio_buffer):
@@ -73,6 +74,7 @@ async def transcribe_audio_process(audio_buffer):
         _transcribe_audio_sync_process,
         audio_buffer,
     )
+
 
 def _transcribe_audio_sync_process(audio_buffer):
     """
@@ -110,7 +112,6 @@ class VideoTransformTrack(MediaStreamTrack):
         # self.cnt+=1
         # print(self.cnt)
         return frame
-
 
 
 class AudioTransformTrack(AudioStreamTrack):
@@ -226,6 +227,7 @@ class AudioTransformTrack(AudioStreamTrack):
             self.audio_data = frameNP
             self.concat = True
 
-      
-        # print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout.name}",)
+        return AudioFrame.from_ndarray(np.zeros((frame.samples, len(frame.layout.channels)), dtype="int16"))
+                
+        # print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout} Channels: {frame.layout.channels}")
         return frame
