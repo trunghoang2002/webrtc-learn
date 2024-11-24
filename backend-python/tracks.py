@@ -14,12 +14,18 @@ import asyncio
 from fastapi.concurrency import run_in_threadpool
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
+from openai import OpenAI
+import random
 load_dotenv()
 torch.set_num_threads(1)
 
 print("Entered Tracks.py")
+client = OpenAI()
+print(f"STARTING NEW: {os.getpid()} OpenAiClient: {client}")
 whisper_model = None
 MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
+
+
 
 def initialize_whisper():
     global whisper_model
@@ -64,22 +70,35 @@ def _transcribe_audio_sync(audio_buffer):
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
 
-async def transcribe_audio_process(audio_buffer):
+async def transcribe_audio_process(audio_buffer, queue):
     """
     Perform transcription using whisper_model in a separate process.
     """
+    print(f"QUEUE", hex(id(queue)))
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(
+    data = await loop.run_in_executor(
         process_executor,
         _transcribe_audio_sync_process,
         audio_buffer,
     )
+
+    print(f"Data type: {type(data)}, Data: {data[:10]} Data Length: {len(data)} No Frames: {len(data/960)}")
+
+    # audio_segment = AudioSegment.from_file(io.BytesIO(data), format="wav")
+    # samples = np.array(audio_segment.get_array_of_samples())
+    # frame = AudioFrame.from_ndarray(samples, format="s16", layout="mono")
+    # frame.sample_rate = audio_segment.frame_rate
+    # frame.time_base = "1/{}".format(audio_segment.frame_rate)
+    # await queue.put(frame)
+
+    return
 
 
 def _transcribe_audio_sync_process(audio_buffer):
     """
     Synchronous transcription logic for running in a thread.
     """
+
     global whisper_model
     if not whisper_model:
         raise ValueError("Whisper model not initialized")
@@ -93,6 +112,24 @@ def _transcribe_audio_sync_process(audio_buffer):
     
     # time.sleep(10)
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+
+    response = client.audio.speech.create(
+        model="tts-1",
+        voice="alloy",
+        input=transcription
+    )
+
+    filename = f"output{random.randint(1, 1000)}.wav"
+    print(f"Response: {response}, response")
+    data = response.read()
+    # print(f"Data type: {type(data)}, Data: {data[:10]}")
+    # f.write(data)
+
+    return data
+    
+
+
+
     
 
 class VideoTransformTrack(MediaStreamTrack):
@@ -127,7 +164,8 @@ class AudioTransformTrack(AudioStreamTrack):
     audio_buffer = []
     model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
     (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
-    
+    _timestamp = 0
+    queue = asyncio.Queue()
     
     def __init__(self, track: AudioStreamTrack):
         super().__init__()  # don't forget this!
@@ -176,6 +214,7 @@ class AudioTransformTrack(AudioStreamTrack):
         frame: AudioFrame = await self.track.recv()
             
         frameNP = frame.to_ndarray()
+        # print(f"FrameNP: {frameNP.shape} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout} Channels: {frame.layout.channels}, TimeStamp: {frame.pts}, Frame SampleRate: {frame.sample_rate}")
         # constantly getting frames need to have states 
         # Silence; Speaking; Speaking_Stopped
 
@@ -217,8 +256,8 @@ class AudioTransformTrack(AudioStreamTrack):
                         print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
                         if(len(self.audio_buffer) > 25):
                             self.audio_buffer = np.concatenate(self.audio_buffer)
-                            
-                            asyncio.create_task(transcribe_audio_process(self.audio_buffer))
+                            print("QUEUE", hex(id(self.queue)))
+                            asyncio.create_task(transcribe_audio_process(self.audio_buffer, self.queue))
 
                         self.audio_buffer = []
                         self.endFrameCnt = 0 
@@ -227,7 +266,11 @@ class AudioTransformTrack(AudioStreamTrack):
             self.audio_data = frameNP
             self.concat = True
 
-        return AudioFrame.from_ndarray(np.zeros((frame.samples, len(frame.layout.channels)), dtype="int16"))
-                
+        return_frame = AudioFrame.from_ndarray(np.zeros((1, frame.samples), dtype="int16"), format="s16", layout="mono")
+        return_frame.sample_rate = frame.sample_rate
+        self._timestamp += return_frame.samples
+        return_frame.pts = self._timestamp
+        return_frame.time_base = frame.time_base
+        # print(f"return_frame = Format: {return_frame.format} Samples: {return_frame.samples} Layout: {return_frame.layout} Channels: {frame.layout.channels}, TimeStamp: {frame.pts}, Frame SampleRate: {frame.sample_rate}")
         # print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout} Channels: {frame.layout.channels}")
-        return frame
+        return return_frame

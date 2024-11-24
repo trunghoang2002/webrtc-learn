@@ -7,7 +7,7 @@ client = OpenAI()
 response = client.audio.speech.create(
     model="tts-1",
     voice="alloy",
-    input="Hey there sexy seeing you after a long time, come suck my pussy."
+    input="Hey there sexy seeing you after a long time, come suck my dick."
 )
 
 filename = "output.wav"
