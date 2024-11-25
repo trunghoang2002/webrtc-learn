@@ -1,6 +1,7 @@
 import io
 import os
 from aiortc import MediaStreamTrack, AudioStreamTrack, VideoStreamTrack
+from aiortc.contrib.media import MediaPlayer
 from av import AudioFrame, VideoFrame
 from pydub import AudioSegment
 import numpy as np
@@ -41,7 +42,7 @@ def initialize_whisper():
         )
 
 thread_executor = ThreadPoolExecutor()
-process_executor = ProcessPoolExecutor(max_workers=1, initializer=initialize_whisper)
+process_executor = ProcessPoolExecutor(max_workers=4, initializer=initialize_whisper)
 
 async def transcribe_audio(audio_buffer):
     """
@@ -82,14 +83,38 @@ async def transcribe_audio_process(audio_buffer, queue):
         audio_buffer,
     )
 
-    print(f"Data type: {type(data)}, Data: {data[:10]} Data Length: {len(data)} No Frames: {len(data/960)}")
+    print(f"Data type: {type(data)}, Data: {data[:10]} Data Length: {len(data)}")
 
-    # audio_segment = AudioSegment.from_file(io.BytesIO(data), format="wav")
-    # samples = np.array(audio_segment.get_array_of_samples())
-    # frame = AudioFrame.from_ndarray(samples, format="s16", layout="mono")
-    # frame.sample_rate = audio_segment.frame_rate
-    # frame.time_base = "1/{}".format(audio_segment.frame_rate)
-    # await queue.put(frame)
+
+    audio_segment: AudioSegment = AudioSegment.from_file(io.BytesIO(data), format="mp3")
+    samples = np.array(audio_segment.get_array_of_samples())
+    print(f"ORG AUDIO : Frame Rate: {audio_segment.frame_rate}, Frame Width: {audio_segment.frame_width}, Channels: {audio_segment.channels} Samples: {type(samples)}, {len(samples)} DType: {samples.dtype} ")
+    # Frame Rate: 24000, Frame Width: 2, Channels: 1 Samples: <class 'numpy.ndarray'>, 11520
+
+    resampled_audio = audio_segment.set_frame_rate(48000)
+    resampled_samples = np.array(resampled_audio.get_array_of_samples())
+    print(f"CON AUDIO : Frame Rate: {resampled_audio.frame_rate}, Frame Width: {resampled_audio.frame_width}, Channels: {resampled_audio.channels} Samples: {type(resampled_samples)}, {len(resampled_samples)} DType: {samples.dtype}")
+    # Frame Rate: 48000, Frame Width: 2, Channels: 1 Samples: <class 'numpy.ndarray'>, 23039
+    
+    # Iterate over resampled_samples to create frames of 960 samples
+    for i in range(0, len(resampled_samples), 960):
+        frame_samples = resampled_samples[i:i + 960]
+        if len(frame_samples) < 960:
+            # Pad the last frame if it's less than 960 samples
+            frame_samples = np.pad(frame_samples, (0, 960 - len(frame_samples)), 'constant')
+        
+        
+        # Convert to AudioFrame
+        frame_samples = frame_samples.reshape(-1, 1)
+        frame_samples = frame_samples.T
+        # print("FRAME: ", frame_samples.shape)
+
+        frame = AudioFrame.from_ndarray(frame_samples, format="s16", layout="mono")
+        
+        # Add frame to the queue
+        await queue.put(frame)
+
+    print("QUEUE PUT DONE")
 
     return
 
@@ -116,7 +141,7 @@ def _transcribe_audio_sync_process(audio_buffer):
     response = client.audio.speech.create(
         model="tts-1",
         voice="alloy",
-        input=transcription
+        input=transcription,
     )
 
     filename = f"output{random.randint(1, 1000)}.wav"
@@ -165,13 +190,13 @@ class AudioTransformTrack(AudioStreamTrack):
     model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad', model='silero_vad')
     (get_speech_timestamps, save_audio, read_audio, VADIterator, collect_chunks) = utils
     _timestamp = 0
-    queue = asyncio.Queue()
     
     def __init__(self, track: AudioStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
+        self.queue = asyncio.Queue()
         initialize_whisper()
-        # self.whisper_model = whisper_model 
+        # self.whisper_model = whisper_model
 
     def int2float(self, sound):
         abs_max = np.abs(sound).max()
@@ -266,11 +291,23 @@ class AudioTransformTrack(AudioStreamTrack):
             self.audio_data = frameNP
             self.concat = True
 
-        return_frame = AudioFrame.from_ndarray(np.zeros((1, frame.samples), dtype="int16"), format="s16", layout="mono")
-        return_frame.sample_rate = frame.sample_rate
-        self._timestamp += return_frame.samples
-        return_frame.pts = self._timestamp
-        return_frame.time_base = frame.time_base
-        # print(f"return_frame = Format: {return_frame.format} Samples: {return_frame.samples} Layout: {return_frame.layout} Channels: {frame.layout.channels}, TimeStamp: {frame.pts}, Frame SampleRate: {frame.sample_rate}")
-        # print(f"Frame: {frame.sample_rate} Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout} Channels: {frame.layout.channels}")
-        return return_frame
+        self._timestamp += frame.samples
+
+        if not self.queue.empty():
+            voice_frame = await self.queue.get()
+            voice_frame.sample_rate = frame.sample_rate
+            voice_frame.pts = self._timestamp
+            voice_frame.time_base = frame.time_base
+            print(f"Voice_frame  = Format: {voice_frame.format} Samples: {voice_frame.samples} Layout: {voice_frame.layout} Channels: {voice_frame.layout.channels}, TimeStamp: {voice_frame.pts}, Frame SampleRate: {voice_frame.sample_rate}, Time Base: {voice_frame.time_base}")
+            # Voice_frame  = Format: <av.AudioFormat s16> Samples: 960 Layout: <av.AudioLayout 'mono'> Channels: (<av.AudioChannel 'FC' (front center)>,), TimeStamp: 432000, Frame SampleRate: 48000
+            return voice_frame
+        
+        empty_frame = AudioFrame.from_ndarray(np.zeros((1, frame.samples), dtype="int16"), format="s16", layout="mono")
+        empty_frame.sample_rate = frame.sample_rate
+        empty_frame.pts = self._timestamp
+        empty_frame.time_base = frame.time_base
+        # print(f"return_frame = Format: {return_frame.format} Samples: {return_frame.samples} Layout: {return_frame.layout} Channels: {return_frame.layout.channels}, TimeStamp: {return_frame.pts}, Frame SampleRate: {return_frame.sample_rate}")
+        # return_frame = Format: <av.AudioFormat s16> Samples: 960 Layout: <av.AudioLayout 'mono'> Channels: (<av.AudioChannel 'FC' (front center)>,), TimeStamp: 167040, Frame SampleRate: 48000
+        # print(f"Org_frame    = Format: {frame.format} Samples: {frame.samples} Layout: {frame.layout} Channels: {frame.layout.channels}, TimeStamp: {frame.pts}, Frame SampleRate: {frame.sample_rate}")
+        # Org_frame    = Format: <av.AudioFormat s16> Samples: 960 Layout: <av.AudioLayout 'stereo'> Channels: (<av.AudioChannel 'FL' (front left)>, <av.AudioChannel 'FR' (front right)>), TimeStamp: 166080, Frame SampleRate: 48000
+        return empty_frame
