@@ -1,2 +1,2 @@
 # webrtc-learn
-This is an attempt to build an omegle clone to learn webrtc and websockets 
+Building Speech to Speech conversation AI agent using STT, TTT, TTS and transmitting over webrtc
