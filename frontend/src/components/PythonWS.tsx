@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react"
 // import { useMicVAD } from "@ricky0123/vad-react";
 
+const URL = 'http://34.142.166.86:8080'
 // const URL = 'http://0.0.0.0:80'
-const URL = 'http://0.0.0.0:80'
 
 export default function PythonWS() {
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -19,7 +19,7 @@ export default function PythonWS() {
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
             console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
-            
+
             if (event.track.kind === "audio") {
                 remoteStreamRef.current.addTrack(event.track);
                 if(remoteVideoRef.current)

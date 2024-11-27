@@ -62,7 +62,7 @@ def _transcribe_audio_sync(audio_buffer):
     print(f"Starting transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
     print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
     segments, _ = whisper_model.transcribe(audio_buffer, language=WHISPER_LANG)
-    segments = [s.text for s in segments]
+    segments = [(print(f"Segment: {s}"), s.text)[1] for s in segments]
     transcription = " ".join(segments)
     print(f"Transcription: {transcription}")
     
@@ -131,11 +131,13 @@ def _transcribe_audio_sync_process(audio_buffer):
     print(f"Starting transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
     print(f"After Audio Buffer Type: {type(audio_buffer)} Audio Buffer Shape: {audio_buffer.shape}")
     segments, _ = whisper_model.transcribe(audio_buffer, language=WHISPER_LANG)
+    print(f"Going to iterate over samples using: {whisper_model}")
+    # segments = [(print(f"Segment: {s}"), s.text)[1] for s in segments]
     segments = [s.text for s in segments]
     transcription = " ".join(segments)
     print(f"PID:{os.getpid()} Transcription: {transcription}")
     
-    # time.sleep(10)
+    time.sleep(10)
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
     response = client.audio.speech.create(
@@ -279,7 +281,7 @@ class AudioTransformTrack(AudioStreamTrack):
                         self.audio_buffer.append(audioFloat32)
                     else:
                         print(f"AUDIO BEFFER TO TRANSCRIBE: ", len(self.audio_buffer))
-                        if(len(self.audio_buffer) > 25):
+                        if(len(self.audio_buffer) > 26):
                             self.audio_buffer = np.concatenate(self.audio_buffer)
                             print("QUEUE", hex(id(self.queue)))
                             asyncio.create_task(transcribe_audio_process(self.audio_buffer, self.queue))
@@ -298,7 +300,7 @@ class AudioTransformTrack(AudioStreamTrack):
             voice_frame.sample_rate = frame.sample_rate
             voice_frame.pts = self._timestamp
             voice_frame.time_base = frame.time_base
-            print(f"Voice_frame  = Format: {voice_frame.format} Samples: {voice_frame.samples} Layout: {voice_frame.layout} Channels: {voice_frame.layout.channels}, TimeStamp: {voice_frame.pts}, Frame SampleRate: {voice_frame.sample_rate}, Time Base: {voice_frame.time_base}")
+            # print(f"Voice_frame  = Format: {voice_frame.format} Samples: {voice_frame.samples} Layout: {voice_frame.layout} Channels: {voice_frame.layout.channels}, TimeStamp: {voice_frame.pts}, Frame SampleRate: {voice_frame.sample_rate}, Time Base: {voice_frame.time_base}")
             # Voice_frame  = Format: <av.AudioFormat s16> Samples: 960 Layout: <av.AudioLayout 'mono'> Channels: (<av.AudioChannel 'FC' (front center)>,), TimeStamp: 432000, Frame SampleRate: 48000
             return voice_frame
         
