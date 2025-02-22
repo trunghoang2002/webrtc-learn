@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react"
 // import { useMicVAD } from "@ricky0123/vad-react";
 
-const URL = 'http://34.142.166.86:8080'
-// const URL = 'http://0.0.0.0:80'
+// const URL = 'http://34.143.253.64:8080'
+const URL = 'http://0.0.0.0:80'
 
 export default function PythonWS() {
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -12,9 +12,7 @@ export default function PythonWS() {
 
     
     const connect = async () => {
-        pcRef.current = new RTCPeerConnection({
-            iceServers: [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }]
-        })
+        pcRef.current = new RTCPeerConnection()
 
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
