@@ -4,10 +4,11 @@ WORKDIR /app
 
 COPY . /app
 
-RUN apt-get install libgomp1
-RUN apt-get install ffmpeg
-RUN apt-get install gcc
-RUN apt-get install g++
+RUN apt-get update
+RUN apt-get install -y libgomp1
+RUN apt-get install -y ffmpeg
+RUN apt-get install -y gcc
+RUN apt-get install -y g++
 RUN pip install --upgrade pip
 # Install Rust compiler (to build sudachipy for Mac)
 RUN curl --proto '=https' --tlsv1.2 -sSf "https://sh.rustup.rs" | sh -s -- -y

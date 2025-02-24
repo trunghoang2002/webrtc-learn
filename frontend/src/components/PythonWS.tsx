@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react"
 // import { useMicVAD } from "@ricky0123/vad-react";
 
 // const URL = 'http://34.143.253.64:8080'
-const URL = 'http://0.0.0.0:80'
+const URL = 'http://127.0.0.1:8000/'
 
 export default function PythonWS() {
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -36,7 +36,7 @@ export default function PythonWS() {
         // })
         
         const constrains = {
-            video: true, 
+            // video: true, 
             audio: {
                 channelCount: 1,
                 sampleRate: 16000

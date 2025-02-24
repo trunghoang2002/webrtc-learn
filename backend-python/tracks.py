@@ -19,17 +19,25 @@ from openai import OpenAI
 import random
 load_dotenv()
 torch.set_num_threads(1)
+from TTS.api import TTS
+import random
+import json
+
 
 print("Entered Tracks.py")
 client = OpenAI()
 print(f"STARTING NEW: {os.getpid()} OpenAiClient: {client}")
 whisper_model = None
-MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cpu", "int8", 10, 8, "en"
+tts_model = None
+messages = []
+MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "distil-small.en", "cuda", "int8", 10, 8, "en"
+
 
 
 
 def initialize_whisper():
     global whisper_model
+    global tts_model
     if whisper_model is None:
         print(f"Initializing Whisper Model in {os.getpid()}")
         whisper_model = WhisperModel (
@@ -40,6 +48,9 @@ def initialize_whisper():
             cpu_threads=CPU_THREADS,
             download_root="./models"
         )
+    
+    if tts_model == None:
+        tts_model= TTS("tts_models/en/ljspeech/fast_pitch").to("cuda")
 
 thread_executor = ThreadPoolExecutor()
 process_executor = ProcessPoolExecutor(max_workers=4, initializer=initialize_whisper)
@@ -66,6 +77,7 @@ def _transcribe_audio_sync(audio_buffer):
     transcription = " ".join(segments)
     print(f"Transcription: {transcription}")
     
+    print("sleep removed")
     # time.sleep(10)
 
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
@@ -86,7 +98,7 @@ async def transcribe_audio_process(audio_buffer, queue):
     print(f"Data type: {type(data)}, Data: {data[:10]} Data Length: {len(data)}")
 
 
-    audio_segment: AudioSegment = AudioSegment.from_file(io.BytesIO(data), format="mp3")
+    audio_segment: AudioSegment = AudioSegment.from_file(io.BytesIO(data), format="wav")
     samples = np.array(audio_segment.get_array_of_samples())
     print(f"ORG AUDIO : Frame Rate: {audio_segment.frame_rate}, Frame Width: {audio_segment.frame_width}, Channels: {audio_segment.channels} Samples: {type(samples)}, {len(samples)} DType: {samples.dtype} ")
     # Frame Rate: 24000, Frame Width: 2, Channels: 1 Samples: <class 'numpy.ndarray'>, 11520
@@ -125,6 +137,7 @@ def _transcribe_audio_sync_process(audio_buffer):
     """
 
     global whisper_model
+    global tts_model
     if not whisper_model:
         raise ValueError("Whisper model not initialized")
 
@@ -136,23 +149,65 @@ def _transcribe_audio_sync_process(audio_buffer):
     segments = [s.text for s in segments]
     transcription = " ".join(segments)
     print(f"PID:{os.getpid()} Transcription: {transcription}")
-    
-    time.sleep(10)
+
+    messages.append({
+        "role": "user",
+        "content": transcription
+    })
+
+    url = 'http://localhost:11434/api/chat'
+    body = {
+        "model": "llama3.2:1b",
+        "messages": messages,
+        "stream": False
+    }
+    x = requests.post(url, json=body)
+    res_json = json.loads(x.text)
+
+    print("Response from Ollama", res_json["message"]["content"])
+
+    messages.append({
+        "role": "assistant",
+        "content": res_json["message"]["content"]
+    })
+
+    transcription = res_json["message"]["content"]
+    # time.sleep(10)
     print(f"Ending   transcription at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
-    response = client.audio.speech.create(
-        model="tts-1",
-        voice="alloy",
-        input=transcription,
-    )
-
+    # audio_data = tts_model.tts(text=transcription)
     filename = f"output{random.randint(1, 1000)}.wav"
-    print(f"Response: {response}, response")
-    data = response.read()
+    output_path = os.path.join(os.getcwd(), filename)
+    print(output_path)
+    
+    print(f"Generating speech using local TTS model...")
+
+    # Convert transcription to speech
+    tts_model.tts_to_file(text=transcription, file_path=output_path)
+
+    print(f"Ending   TTS at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+    print(f"TTS output saved as {output_path}")
+    
+    # Read the generated audio file
+    with open(output_path, "rb") as f:
+        audio_data = f.read()
+    
+    print(f"Ending   File Read at: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+
+    # response = client.audio.speech.create(
+    #     model="tts-1",
+    #     voice="alloy",
+    #     input=transcription,
+    # )
+
+    # filename = f"output{random.randint(1, 1000)}.wav"
+    # print(f"Response: {response}, response")
+    # data = response.read()
+
     # print(f"Data type: {type(data)}, Data: {data[:10]}")
     # f.write(data)
 
-    return data
+    return audio_data
     
 
 
