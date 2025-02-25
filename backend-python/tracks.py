@@ -38,6 +38,7 @@ MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "di
 def initialize_whisper():
     global whisper_model
     global tts_model
+    print("Initializing Whisper")
     if whisper_model is None:
         print(f"Initializing Whisper Model in {os.getpid()}")
         whisper_model = WhisperModel (
@@ -54,6 +55,8 @@ def initialize_whisper():
 
 thread_executor = ThreadPoolExecutor()
 process_executor = ProcessPoolExecutor(max_workers=4, initializer=initialize_whisper)
+
+
 
 async def transcribe_audio(audio_buffer):
     """
@@ -135,7 +138,7 @@ def _transcribe_audio_sync_process(audio_buffer):
     """
     Synchronous transcription logic for running in a thread.
     """
-
+    
     global whisper_model
     global tts_model
     if not whisper_model:
@@ -154,6 +157,8 @@ def _transcribe_audio_sync_process(audio_buffer):
         "role": "user",
         "content": transcription
     })
+
+    
 
     url = 'http://localhost:11434/api/chat'
     body = {
@@ -210,9 +215,14 @@ def _transcribe_audio_sync_process(audio_buffer):
     return audio_data
     
 
-
-
-    
+async def empty_queue(queue: asyncio.Queue):
+    print("Emptying audio queue")
+    while not queue.empty():
+        try:
+            queue.get_nowait()  # Remove an item from the queue
+            queue.task_done()   # Mark it as processed
+        except asyncio.QueueEmpty:
+            break  # Queue is empty, exit loop
 
 class VideoTransformTrack(MediaStreamTrack):
     """
@@ -253,6 +263,9 @@ class AudioTransformTrack(AudioStreamTrack):
         self.track = track
         self.queue = asyncio.Queue()
         initialize_whisper()
+        print("Initializing Audio Transform Track")
+        # asyncio.create_task(transcribe_audio_process(self.audio_buffer, self.queue))
+        
         # self.whisper_model = whisper_model
 
     def int2float(self, sound):
@@ -322,15 +335,22 @@ class AudioTransformTrack(AudioStreamTrack):
 
             new_confidence = self.model(torch.from_numpy(audioFloat32_512), 16000).item()
             new_confidence = (int) (round(new_confidence, 1) * 10)
-            if(new_confidence > 0):
+            if(new_confidence > 1):
+                while not self.queue.empty():
+                    print("QUEUE EMPTYING", hex(id(self.queue)))
+                    try:
+                        self.queue.get_nowait()
+                        self.queue.task_done()
+                    except asyncio.QueueEmpty:
+                        break
                 self.endFrameCnt = 0
                 self.audio_buffer.append(audioFloat32)
                 print(f"Confidence: {new_confidence:02d} {'=' * new_confidence}> : Cnt: {len(self.audio_buffer)}")
             else:
-                if(len(self.audio_buffer) <= 1):
+                if(len(self.audio_buffer) <= 3):
                     self.audio_buffer = [audioFloat32]
 
-                elif(len(self.audio_buffer) > 1):
+                elif(len(self.audio_buffer) > 3):
                     if(self.endFrameCnt < 20):
                         self.endFrameCnt += 1
                         self.audio_buffer.append(audioFloat32)

@@ -11,16 +11,6 @@ from faster_whisper import WhisperModel
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("server")
 
-# create whisper model 
-MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "tiny.en", "cuda", "int8", 10, 4, "en"
-whisper_model = WhisperModel(
-    model_size_or_path=MODEL_TYPE,
-    device=RUN_TYPE,
-    compute_type=COMPUTE_TYPE,
-    num_workers=NUM_WORKERS,
-    cpu_threads=CPU_THREADS,
-    download_root="./models"
-)
 
 # create FastAPI app
 app = FastAPI()
