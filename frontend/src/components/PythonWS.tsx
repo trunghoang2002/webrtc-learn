@@ -16,11 +16,12 @@ export default function PythonWS() {
     const [stream, setStream] = useState<MediaStream | null>(null)
 
     
+    
     const connect = async () => {
         setAgentState('Connecting')
 
         pcRef.current = new RTCPeerConnection()
-        
+
         
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
