@@ -1,27 +1,36 @@
 import { useState, useEffect, useRef } from "react"
+import { CircleOut } from "./audio/CircleOut";
 // import { useMicVAD } from "@ricky0123/vad-react";
 
 // const URL = 'http://34.143.253.64:8080'
 const URL = 'http://127.0.0.1:8000/'
+
+type AgentState = 'Disconnected' | 'Connected' | 'Connecting'
 
 export default function PythonWS() {
     const localVideoRef = useRef<HTMLVideoElement | null>(null);
     const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const remoteStreamRef = useRef(new MediaStream());
+    const [agentState, setAgentState] = useState<AgentState>('Disconnected')
+    const [stream, setStream] = useState<MediaStream | null>(null)
 
     
     const connect = async () => {
-        pcRef.current = new RTCPeerConnection()
+        setAgentState('Connecting')
 
+        pcRef.current = new RTCPeerConnection()
+        
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
             console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
 
             if (event.track.kind === "audio") {
                 remoteStreamRef.current.addTrack(event.track);
-                if(remoteVideoRef.current)
+                if(remoteVideoRef.current){
+                    setStream(new MediaStream(remoteStreamRef.current.getAudioTracks()));
                     remoteVideoRef.current.srcObject = remoteStreamRef.current;
+                }
             }
             
             if (event.track.kind === "video") {
@@ -107,6 +116,8 @@ export default function PythonWS() {
         console.log("Got answer from server: ", pcRef.current?.remoteDescription)
         console.log("Connected to Server")
 
+        setAgentState('Connected')
+
     }
 
     const disconnect =  () => {
@@ -125,15 +136,18 @@ export default function PythonWS() {
         
 
     return (
-        <div className="flex flex-col justify-center items-center">
+        <div className="flex flex-col justify-center items-center gap-10">
             <h1>Python Websocket</h1>
+            <CircleOut stream={stream} />
+            <h1>{agentState}</h1>
             <div className="flex flex-row gap-4">
                 <button onClick={connect}> Connect </button>
                 <button onClick={disconnect}> Disconnect </button>
             </div>
-            <h1> Local Video </h1>
+            {/* <h1> Local Video </h1> */}
             {/* <video ref={localVideoRef} autoPlay playsInline/> */}
-            <h1> Remote Video </h1>
+            {/* <h1> Remote Video </h1> */}
+            
             <video ref={remoteVideoRef} autoPlay playsInline/>
         </div>
     )
