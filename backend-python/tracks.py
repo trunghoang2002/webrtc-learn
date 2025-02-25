@@ -29,9 +29,22 @@ client = OpenAI()
 print(f"STARTING NEW: {os.getpid()} OpenAiClient: {client}")
 whisper_model = None
 tts_model = None
-messages = []
 MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "distil-small.en", "cuda", "int8", 10, 8, "en"
 
+messages = []
+
+class SharedList:
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.data = []
+
+    async def append(self, item):
+        async with self.lock:
+            self.data.append(item)
+
+    async def get_all(self):
+        async with self.lock:
+            return list(self.data)
 
 
 
@@ -264,6 +277,8 @@ class AudioTransformTrack(AudioStreamTrack):
         self.queue = asyncio.Queue()
         initialize_whisper()
         print("Initializing Audio Transform Track")
+        global messages
+        messages = []
         # asyncio.create_task(transcribe_audio_process(self.audio_buffer, self.queue))
         
         # self.whisper_model = whisper_model
