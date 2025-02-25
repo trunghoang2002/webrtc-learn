@@ -21,6 +21,7 @@ export default function PythonWS() {
 
         pcRef.current = new RTCPeerConnection()
         
+        
         // Add remote stream to video element
         pcRef.current.ontrack =  (event) => {
             console.log("REMOTE STREAM RECEIVED!!!: ", event.track)
