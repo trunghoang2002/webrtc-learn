@@ -15,7 +15,7 @@ import asyncio
 from fastapi.concurrency import run_in_threadpool
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import time
-from openai import OpenAI
+# from openai import OpenAI
 import random
 load_dotenv()
 torch.set_num_threads(1)
@@ -25,8 +25,8 @@ import json
 
 
 print("Entered Tracks.py")
-client = OpenAI()
-print(f"STARTING NEW: {os.getpid()} OpenAiClient: {client}")
+# client = OpenAI()
+# print(f"STARTING NEW: {os.getpid()} OpenAiClient: {client}")
 whisper_model = None
 tts_model = None
 MODEL_TYPE, RUN_TYPE, COMPUTE_TYPE, NUM_WORKERS, CPU_THREADS, WHISPER_LANG = "distil-small.en", "cuda", "int8", 10, 8, "en"

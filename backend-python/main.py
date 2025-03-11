@@ -52,14 +52,10 @@ async def offer(request: Request):
         answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
         
+        return {"type": pc.localDescription.type, "sdp": pc.localDescription.sdp}
     except Exception as e:
         print("Exception: \n", e)
-        # print("Exception: ", e)
-
-    return {"type": pc.localDescription.type, "sdp": pc.localDescription.sdp}
-
-
-
+        raise e
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=80)
